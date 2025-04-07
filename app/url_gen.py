@@ -302,12 +302,14 @@ async def non_uwp_gen(session, product_id):
     )
 
 
-def extract_product_id(url):
-    """Extract product ID from Microsoft Store URL"""
+def extract_product_id(value: str) -> str:
+    """Handles both full URLs and raw product IDs"""
+    if re.match(r"^[a-z0-9]{12}$", value, re.IGNORECASE):
+        return value
     pattern = re.compile(r".+\/([^\/\?]+)(?:\?|$)")
-    if match := pattern.search(str(url)):
+    if match := pattern.search(str(value)):
         return match.group(1)
-    raise ValueError("Invalid URL format - Please provide a valid Microsoft Store URL")
+    raise ValueError("Invalid input - Provide a valid Microsoft Store URL or Product ID")
 
 
 async def fetch_product_details(session, product_id):
@@ -326,10 +328,10 @@ async def fetch_product_details(session, product_id):
         )
 
 
-async def url_generator(url, ignore_ver, all_dependencies):
+async def url_generator(input, ignore_ver, all_dependencies):
     """Generate download URLs for Microsoft Store apps"""
     try:
-        product_id = extract_product_id(url)
+        product_id = extract_product_id(input)
 
         timeout = aiohttp.ClientTimeout(total=60)
         async with aiohttp.ClientSession(
@@ -350,3 +352,47 @@ async def url_generator(url, ignore_ver, all_dependencies):
 
     except (aiohttp.ClientError, json.JSONDecodeError) as e:
         raise ConnectionError(f"Failed to fetch app details: {str(e)}")
+
+def extract_version_from_filename(filename: str) -> str:
+    """
+    Extracts version from a file name like:
+    WhatsApp_2.2409.2.0_x64__cv1g1gvanyjgm.AppxBundle
+    """
+    version_pattern = re.compile(r"_(\d+\.\d+\.\d+\.\d+)_")
+    match = version_pattern.search(filename)
+    if match:
+        return match.group(1)
+    return "Unknown"
+
+async def get_app_info(input: str):
+    product_id = extract_product_id(input)
+    timeout = aiohttp.ClientTimeout(total=30)
+    async with aiohttp.ClientSession(timeout=timeout) as session:
+        response = await fetch_product_details(session, product_id)
+
+        if not response.get("Payload"):
+            raise ValueError("Invalid product ID or URL")
+
+        product = response["Payload"]
+
+        app_name = product.get("Title", "Unknown")
+        publisher = product.get("PublisherName", "Unknown")
+        last_update = product.get("LastUpdateDateUtc", "Unknown")
+
+        # Now get filename (and version from it) using internal parsing
+        fulfillment_data = product["Skus"][0].get("FulfillmentData")
+        if not fulfillment_data:
+            raise Exception("No fulfillment data found")
+
+        file_dict, file_list, main_file_name, is_uwp = await uwp_gen(
+            session, fulfillment_data, ignore_ver=False, all_dependencies=False
+        )
+        version = extract_version_from_filename(main_file_name)
+
+        return {
+            "name": app_name,
+            "version": version,
+            "last_update": last_update,
+            "publisher": publisher,
+            "product_id": product_id,
+        }

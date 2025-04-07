@@ -1,0 +1,5 @@
+env
+downloads
+log.txt
+__pycache__
+*.pyc
