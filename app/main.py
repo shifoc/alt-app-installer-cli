@@ -35,11 +35,19 @@ parser.add_argument(
     help="Retrieve and display app info only",
     action="store_true",
 )
+parser.add_argument(
+    "-k",
+    "--insecure",
+    help="Disable SSL verification",
+    action="store_true",
+)
 
 args = parser.parse_args()
+verify_ssl = not args.insecure
+
 if args.info_only:
     print("Fetching app info...")
-    info = asyncio.run(get_app_info(args.input))
+    info = asyncio.run(get_app_info(args.input, verify_ssl))
     print(f"Name        : {info['name']}")
     print(f"Version     : {info['version']}")
     print(f"Publisher   : {info['publisher']}")
@@ -47,7 +55,7 @@ if args.info_only:
     print(f"Product ID  : {info['product_id']}")
     exit(0)
 print("Downloading Packages...")
-data = download(args.input, args.ignore_ver, args.all_dependencies)
+data = download(args.input, args.ignore_ver, args.all_dependencies, verify_ssl)
 if not args.download_only:
     print("Installing Packages...")
     install(*data)

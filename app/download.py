@@ -18,10 +18,10 @@ def default_logger(name: str) -> logging.Logger:
     return logger
 
 
-def download(url, ignore_ver, all_dependencies):
+def download(url, ignore_ver, all_dependencies, verify_ssl=True):
     print("Fetching data...")
     main_dict, final_data, file_name, uwp = asyncio.run(
-        url_generator(url, ignore_ver, all_dependencies)
+        url_generator(url, ignore_ver, all_dependencies, verify_ssl)
     )
 
     dwnpath = "downloads/"
@@ -31,14 +31,14 @@ def download(url, ignore_ver, all_dependencies):
 
     path_lst = []
     tasks = []
-    d = Pypdl(logger=default_logger("downloader"), max_concurrent=2)
+    d = Pypdl(logger=default_logger("downloader"), max_concurrent=2, verify_ssl=verify_ssl)
     for f_name in final_data:
         remote_url = main_dict[f_name]
         path = f"{dwnpath}{f_name}"
         path_lst.append(path)
 
         async def new_url_gen():
-            urls = await url_generator(url, ignore_ver, all_dependencies)
+            urls = await url_generator(url, ignore_ver, all_dependencies, verify_ssl)
             return urls[0][f_name]
 
         tasks.append(

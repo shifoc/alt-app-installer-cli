@@ -97,7 +97,7 @@ def parse_dict(main_dict, file_name, ignore_ver, all_dependencies):
             )
             full_data[mapped_key] = key
 
-    # Collect entries by their “cleaned-up name”
+    # Collect entries by their "cleaned-up name"
     names_dict = {}
     for mapped_key in full_data:
         name_base = mapped_key[0]
@@ -328,14 +328,15 @@ async def fetch_product_details(session, product_id):
         )
 
 
-async def url_generator(input, ignore_ver, all_dependencies):
+async def url_generator(input, ignore_ver, all_dependencies, verify_ssl=True):
     """Generate download URLs for Microsoft Store apps"""
     try:
         product_id = extract_product_id(input)
 
         timeout = aiohttp.ClientTimeout(total=60)
+        connector = aiohttp.TCPConnector(ssl=verify_ssl)
         async with aiohttp.ClientSession(
-            timeout=timeout, raise_for_status=True
+            timeout=timeout, raise_for_status=True, connector=connector
         ) as session:
             response = await fetch_product_details(session, product_id)
 
@@ -353,6 +354,7 @@ async def url_generator(input, ignore_ver, all_dependencies):
     except (aiohttp.ClientError, json.JSONDecodeError) as e:
         raise ConnectionError(f"Failed to fetch app details: {str(e)}")
 
+
 def extract_version_from_filename(filename: str) -> str:
     """
     Extracts version from a file name like:
@@ -364,10 +366,12 @@ def extract_version_from_filename(filename: str) -> str:
         return match.group(1)
     return "Unknown"
 
-async def get_app_info(input: str):
+
+async def get_app_info(input: str, verify_ssl=True):
     product_id = extract_product_id(input)
     timeout = aiohttp.ClientTimeout(total=30)
-    async with aiohttp.ClientSession(timeout=timeout) as session:
+    connector = aiohttp.TCPConnector(ssl=verify_ssl)
+    async with aiohttp.ClientSession(timeout=timeout, connector=connector) as session:
         response = await fetch_product_details(session, product_id)
 
         if not response.get("Payload"):
